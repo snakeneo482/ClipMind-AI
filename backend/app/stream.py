@@ -177,9 +177,13 @@ class StreamSession:
         )
 
     def _run(self):
+        # NOTE: we intentionally do NOT pass --twitch-disable-ads. Ad-blocking on
+        # anonymous Twitch sessions makes the feed stall on an "ad break" filler
+        # segment. Letting ads play through keeps the stream flowing (they just
+        # get captured like any other footage).
         sl_cmd = [
             config.STREAMLINK, "--stdout", "--hls-live-edge", "2",
-            "--twitch-disable-ads", "--retry-open", "3", self.url, "best",
+            "--retry-open", "3", "--retry-streams", "5", self.url, "best",
         ]
         ff_cmd = [
             config.FFMPEG, "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
