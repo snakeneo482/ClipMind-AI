@@ -63,16 +63,20 @@ def build_clip(start: float, end: float, score: float, clip_id: str,
     segs = segments_in_window(start, end)
     if len(segs) < 2:
         return None
-    # Cut on whole-segment boundaries only -> the clip is always CONTINUOUS and
-    # never sliced mid-action. Keep the most recent MAX_CLIP worth of segments
-    # (that's the peak + tail); ensure at least MIN_CLIP.
+    # Cut on whole-segment boundaries only -> always CONTINUOUS, never sliced
+    # mid-action. Keep from the START of the window (the buildup + the trigger
+    # come first, the reaction follows) so the clip STARTS at the right moment
+    # and we trim only an over-long tail. Ensure at least MIN_CLIP.
     max_segs = max(1, round(config.MAX_CLIP / config.SEGMENT_SECONDS))
     min_segs = max(2, round(config.MIN_CLIP / config.SEGMENT_SECONDS))
     if len(segs) > max_segs:
-        segs = segs[-max_segs:]
+        segs = segs[:max_segs]
     if len(segs) < min_segs:
-        # grab a few extra earlier segments if the buffer has them
-        segs = segments_in_window(end - config.MIN_CLIP, end) or segs
+        # too short — WIDEN the window back toward MAX to pull in more buffered
+        # footage (falls short only if the buffer genuinely doesn't have it yet)
+        wider = segments_in_window(end - config.MAX_CLIP, end)
+        if len(wider) > len(segs):
+            segs = wider[:max_segs]
     duration = len(segs) * config.SEGMENT_SECONDS
 
     work = config.CLIPS
@@ -91,11 +95,19 @@ def build_clip(start: float, end: float, score: float, clip_id: str,
     hook_file.write_text(hook, encoding="utf-8")
 
     font = "C\\:/Windows/Fonts/arialbd.ttf"
-    vf = (
-        f"crop=ih*9/16:ih,scale={config.OUT_W}:{config.OUT_H},"
+    W, H = config.OUT_W, config.OUT_H
+    # Quality-first 9:16: scale the FULL frame DOWN to fit the width (sharp, no
+    # upscaling) and center it over a blurred, zoomed copy of itself — instead
+    # of cropping a narrow slice and upscaling it (which was the blurry look).
+    fc = (
+        f"[0:v]split=2[bg][fg];"
+        f"[bg]scale={W}:{H}:force_original_aspect_ratio=increase,"
+        f"crop={W}:{H},gblur=sigma=22[bgb];"
+        f"[fg]scale={W}:-2:flags=lanczos[fgs];"
+        f"[bgb][fgs]overlay=(W-w)/2:(H-h)/2,"
         f"drawtext=fontfile='{font}':textfile='{_escape_drawtext(hook_file)}':"
-        f"fontcolor=white:fontsize=64:box=1:boxcolor=black@0.55:boxborderw=24:"
-        f"x=(w-text_w)/2:y=140:enable='lt(t,4)'"
+        f"fontcolor=white:fontsize=62:box=1:boxcolor=black@0.6:boxborderw=24:"
+        f"x=(w-text_w)/2:y=210:enable='lt(t,4)'[v]"
     )
     # Re-encode the whole concatenated run — no -ss, no -t, so the FULL clip is
     # produced continuously. genpts + faststart keep timestamps monotonic and
@@ -104,10 +116,10 @@ def build_clip(start: float, end: float, score: float, clip_id: str,
         config.FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
         "-fflags", "+genpts",
         "-f", "concat", "-safe", "0", "-i", str(concat_list),
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k",
+        "-filter_complex", fc, "-map", "[v]", "-map", "0:a?",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "19",
+        "-pix_fmt", "yuv420p", "-profile:v", "high", "-level", "4.1",
+        "-r", "30", "-c:a", "aac", "-b:a", "160k", "-ar", "44100",
         "-movflags", "+faststart",
         str(out_path),
     ]
