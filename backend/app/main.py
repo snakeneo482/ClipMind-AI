@@ -15,6 +15,7 @@ import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -26,6 +27,26 @@ app = FastAPI(title="ClipMind AI", version="0.1.0")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
+
+
+# --- live HLS preview (our own ad-free feed) ------------------------------
+# Explicit no-cache manifest route MUST be registered before the /live mount
+# so the player always revalidates the sliding playlist.
+@app.get("/live/stream.m3u8")
+def hls_manifest():
+    m = config.LIVE / "stream.m3u8"
+    if not m.exists():
+        return Response(status_code=404)
+    # Return the FULL playlist as 200 (never a 206 range) — a partial manifest
+    # makes hls.js re-parse in a tight loop and stall.
+    data = m.read_bytes()
+    return Response(
+        content=data, media_type="application/vnd.apple.mpegurl",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+app.mount("/live", StaticFiles(directory=str(config.LIVE)), name="live")
 app.mount("/clips", StaticFiles(directory=str(config.CLIPS)), name="clips")
 
 

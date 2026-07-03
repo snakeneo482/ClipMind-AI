@@ -6,6 +6,7 @@ module.exports = {
     return [
       { source: "/api/:path*", destination: `${API}/api/:path*` },
       { source: "/clips/:path*", destination: `${API}/clips/:path*` },
+      { source: "/live/:path*", destination: `${API}/live/:path*` },
     ];
   },
 };

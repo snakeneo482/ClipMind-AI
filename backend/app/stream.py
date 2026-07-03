@@ -115,6 +115,12 @@ class StreamSession:
                     p.unlink()
                 except OSError:
                     pass
+            # wipe stale HLS preview so the player never loads an old manifest
+            for p in list(config.LIVE.glob("*.ts")) + list(config.LIVE.glob("*.m3u8")):
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
             self.url = url
             self.platform = self._detect_platform(url)
             self.embed = _embed_info(url)
@@ -177,21 +183,27 @@ class StreamSession:
         )
 
     def _run(self):
-        # NOTE: we intentionally do NOT pass --twitch-disable-ads. Ad-blocking on
-        # anonymous Twitch sessions makes the feed stall on an "ad break" filler
-        # segment. Letting ads play through keeps the stream flowing (they just
-        # get captured like any other footage).
+        # Skip Twitch ad segments so our own captured feed (buffer + preview)
+        # stays clean — the dashboard shows THIS feed, not Twitch's player, so
+        # their "commercial break in progress" overlay can never appear.
         sl_cmd = [
             config.STREAMLINK, "--stdout", "--hls-live-edge", "2",
-            "--retry-open", "3", "--retry-streams", "5", self.url, "best",
+            "--twitch-disable-ads", "--retry-open", "3", "--retry-streams", "5",
+            self.url, "best",
         ]
         ff_cmd = [
             config.FFMPEG, "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
-            # NOTE: no -reset_timestamps — segments must keep continuous PTS so
-            # concatenating them yields one seamless, non-glitchy clip.
+            # output 1: rolling buffer for clipping. NOTE no -reset_timestamps —
+            # segments must keep continuous PTS so concat yields a seamless clip.
             "-map", "0", "-c", "copy", "-f", "segment",
             "-segment_time", str(config.SEGMENT_SECONDS), "-strftime", "1",
             str(config.SEGMENTS / "seg_%Y%m%d_%H%M%S.ts"),
+            # output 2: sliding-window HLS the dashboard plays (ad-free preview)
+            "-map", "0", "-c", "copy", "-f", "hls",
+            "-hls_time", "2", "-hls_list_size", "6",
+            "-hls_flags", "delete_segments+omit_endlist+independent_segments",
+            "-hls_segment_filename", str(config.LIVE / "live_%05d.ts"),
+            str(config.LIVE / "stream.m3u8"),
         ]
         try:
             sl = subprocess.Popen(sl_cmd, stdout=subprocess.PIPE,

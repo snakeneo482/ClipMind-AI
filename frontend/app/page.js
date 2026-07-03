@@ -1,17 +1,46 @@
 "use client";
 import { memo, useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 
 const STATUS_LABEL = {
   idle: "Idle", connecting: "Connecting…", live: "Live", stopped: "Stopped",
   ended: "Stream ended", error: "Error",
 };
 
-// Isolated so the 2Hz status polling can never re-render / reload the live
-// player. It only re-mounts when the src string actually changes.
-const LivePlayer = memo(function LivePlayer({ src }) {
+// Plays OUR captured, ad-free HLS feed (never Twitch's player), so their
+// "commercial break in progress" overlay can't appear. Memoized + no props so
+// the 2Hz status poll can never re-mount or interrupt it.
+const LivePlayer = memo(function LivePlayer() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    const src = "/live/stream.m3u8";
+    let hls;
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = src; // native HLS (Safari)
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        liveSyncDurationCount: 3,
+        manifestLoadingMaxRetry: 30,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingMaxRetry: 30,
+      });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        // stream not up yet / transient — keep retrying instead of dying
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls.startLoad(), 1500);
+          else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        }
+      });
+    }
+    return () => { if (hls) hls.destroy(); };
+  }, []);
   return (
     <div className="preview">
-      <iframe src={src} allow="autoplay; fullscreen" allowFullScreen title="live stream" />
+      <video ref={ref} autoPlay muted controls playsInline />
     </div>
   );
 });
@@ -88,12 +117,12 @@ export default function Home() {
 
   // Keep the player mounted while a stream is active; only drop it on a real stop.
   useEffect(() => {
-    if (running && snap?.embed?.src) {
-      if (snap.embed.src !== liveSrc) setLiveSrc(snap.embed.src);
-    } else if (!running && ["stopped", "idle", "ended", "error"].includes(status)) {
-      if (liveSrc !== null) setLiveSrc(null);
+    if (running) {
+      if (!liveSrc) setLiveSrc("on");
+    } else if (["stopped", "idle", "ended", "error"].includes(status)) {
+      if (liveSrc) setLiveSrc(null);
     }
-  }, [running, status, snap?.embed?.src, liveSrc]);
+  }, [running, status, liveSrc]);
 
   async function start() {
     if (!url.trim()) return;
@@ -156,9 +185,11 @@ export default function Home() {
         )}
       </div>
 
-      {liveSrc && <LivePlayer src={liveSrc} />}
-      {running && !snap?.embed?.src && (
-        <div className="preview ph-box">Live preview unavailable for this URL — detection still running.</div>
+      {liveSrc && <LivePlayer />}
+      {liveSrc && (
+        <div className="feedhint">
+          Ad-free preview from ClipMind’s own capture (~10–20s behind live) — no Twitch ad breaks.
+        </div>
       )}
 
       <div className="grid">

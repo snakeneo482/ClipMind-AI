@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]        # .../clipmind
 DATA = ROOT / "data"
 SEGMENTS = DATA / "segments"                        # rolling live buffer (.ts)
 CLIPS = DATA / "clips"                              # finished vertical clips
-for d in (DATA, SEGMENTS, CLIPS):
+LIVE = DATA / "live"                                # ad-free HLS preview feed
+for d in (DATA, SEGMENTS, CLIPS, LIVE):
     d.mkdir(parents=True, exist_ok=True)
 
 
