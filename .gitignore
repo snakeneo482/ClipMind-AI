@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# next.js
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+
+# runtime data — clips, buffered segments (regenerated at runtime)
+data/
+!data/.gitkeep
+
+# env / local
+.env
+.env.local
+*.log
