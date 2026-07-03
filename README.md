@@ -10,10 +10,12 @@ spikes with a burned-in hook banner.
   - Audio: momentary loudness (EBU R128) vs. an adaptive baseline.
   - Chat: messages/sec + hype-word density (Twitch anonymous IRC). YouTube/Kick
     degrade gracefully to audio-only.
-- **Auto-clipping**: on score ≥ threshold, cut `PRE_ROLL`s before → `POST_ROLL`s
-  after, crop to 1080×1920, burn an AI hook/title banner, generate a thumbnail.
-- **Dashboard**: live viral-score gauge, sub-scores, detection feed, clip grid
-  with inline playback + download. Plus a **Clip now** manual grab button.
+- **Auto-clipping**: opens a highlight when the score crosses the threshold and
+  **auto-extends while the hype lasts** — clips run a dynamic **15–60s**, cropped
+  to 1080×1920 with a burned-in AI hook/title banner + thumbnail.
+- **Dashboard**: live player embed, viral-score gauge, sub-scores, detection feed,
+  clip grid with inline playback, **Save to PC** (copies into your Downloads
+  folder) and Download. Plus a **Clip now** manual grab (last 45s).
 
 ## Not yet (documented roadmap, per spec)
 Facecam CV emotion, per-game event models, Whisper animated subtitles, auto-posting
@@ -34,8 +36,10 @@ npm run dev
 Open http://localhost:3000, paste a live URL, press **Start clipping**.
 
 ## Tunables (env vars)
-`CLIPMIND_THRESHOLD` (70) · `CLIPMIND_PRE_ROLL` (20) · `CLIPMIND_POST_ROLL` (15) ·
-`CLIPMIND_COOLDOWN` (45). Output lands in `clipmind/data/clips`.
+`CLIPMIND_THRESHOLD` (42, opens a highlight) · `CLIPMIND_SUSTAIN` (24, keeps it
+open) · `CLIPMIND_MIN_CLIP` (15) · `CLIPMIND_MAX_CLIP` (60) · `CLIPMIND_PRE_ROLL`
+(10) · `CLIPMIND_MANUAL` (45) · `CLIPMIND_COOLDOWN` (15).
+Output lands in `clipmind/data/clips`; **Save to PC** copies to `~/Downloads`.
 
 ## Requirements
 Python 3.11+, Node 18+, `ffmpeg`, `streamlink` (installed automatically if you
