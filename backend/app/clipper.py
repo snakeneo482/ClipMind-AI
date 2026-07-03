@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from . import config
+from . import captions
 
 SEG_FMT = "seg_%Y%m%d_%H%M%S.ts"
 
@@ -55,7 +56,8 @@ def _escape_drawtext(path: Path) -> str:
     return str(path).replace("\\", "/").replace(":", "\\:")
 
 
-def build_clip(start: float, end: float, score: float, clip_id: str) -> dict | None:
+def build_clip(start: float, end: float, score: float, clip_id: str,
+               platform: str | None = None) -> dict | None:
     # clamp total length to [MIN_CLIP, MAX_CLIP]
     dur = end - start
     if dur < config.MIN_CLIP:
@@ -119,6 +121,7 @@ def build_clip(start: float, end: float, score: float, clip_id: str) -> dict | N
     for f in (concat_list, hook_file):
         f.unlink(missing_ok=True)
 
+    cap = captions.generate(title, hook, platform, clip_id, score)
     return {
         "id": clip_id,
         "file": out_path.name,
@@ -127,5 +130,8 @@ def build_clip(start: float, end: float, score: float, clip_id: str) -> dict | N
         "title": title,
         "score": round(score, 1),
         "duration": duration,
+        "caption": cap["caption"],
+        "hashtags": cap["hashtags"],
+        "posted": False,
         "created_at": datetime.now().isoformat(timespec="seconds"),
     }

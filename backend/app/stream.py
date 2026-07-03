@@ -308,7 +308,7 @@ class StreamSession:
             self._stop.wait(wait)
             if self._stop.is_set():
                 return
-            result = build_clip(start, end, score, clip_id)
+            result = build_clip(start, end, score, clip_id, self.platform)
             if not result:
                 self._log("Clip skipped — not enough buffered footage", "warn")
             elif result.get("error"):

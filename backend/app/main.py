@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from . import config
 from .stream import SESSION
+from .instagram import POSTER
 
 app = FastAPI(title="ClipMind AI", version="0.1.0")
 app.add_middleware(
@@ -30,6 +31,14 @@ app.mount("/clips", StaticFiles(directory=str(config.CLIPS)), name="clips")
 
 class StartReq(BaseModel):
     url: str
+
+
+@app.on_event("startup")
+def _restore_ig():
+    try:
+        POSTER.restore()
+    except Exception:
+        pass
 
 
 @app.get("/api/health")
@@ -50,6 +59,47 @@ def stop():
 @app.get("/api/status")
 def status():
     return SESSION.snapshot()
+
+
+# --- Instagram (private-login posting, review & approve) -------------------
+class LoginReq(BaseModel):
+    username: str
+    password: str
+    verification_code: str = ""
+
+
+class PostReq(BaseModel):
+    file: str
+    caption: str
+
+
+@app.get("/api/instagram/status")
+def ig_status():
+    return POSTER.status()
+
+
+@app.post("/api/instagram/login")
+def ig_login(req: LoginReq):
+    return POSTER.login(req.username, req.password, req.verification_code)
+
+
+@app.post("/api/instagram/logout")
+def ig_logout():
+    return POSTER.logout()
+
+
+@app.post("/api/instagram/post")
+def ig_post(req: PostReq):
+    name = os.path.basename(req.file)
+    clip = next((c for c in SESSION.clips if c["file"] == name), None)
+    video = config.CLIPS / name
+    thumb = config.CLIPS / clip["thumb"] if (clip and clip.get("thumb")) else None
+    res = POSTER.post_reel(video, req.caption, thumb)
+    if res.get("ok") and clip is not None:
+        clip["posted"] = True
+        clip["post_url"] = res.get("url")
+        SESSION._log(f"📸 Posted to Instagram: {clip['title']}", "ok")
+    return res
 
 
 @app.post("/api/clip/manual")
