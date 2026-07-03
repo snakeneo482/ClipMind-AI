@@ -187,9 +187,10 @@ class StreamSession:
         ]
         ff_cmd = [
             config.FFMPEG, "-hide_banner", "-loglevel", "error", "-i", "pipe:0",
+            # NOTE: no -reset_timestamps — segments must keep continuous PTS so
+            # concatenating them yields one seamless, non-glitchy clip.
             "-map", "0", "-c", "copy", "-f", "segment",
             "-segment_time", str(config.SEGMENT_SECONDS), "-strftime", "1",
-            "-reset_timestamps", "1",
             str(config.SEGMENTS / "seg_%Y%m%d_%H%M%S.ts"),
         ]
         try:

@@ -39,15 +39,15 @@ STREAMLINK = _resolve("streamlink", rf"{_APPDATA}\Python\Python314\Scripts\strea
 # --- Tunables (overridable via env) ---------------------------------------
 SEGMENT_SECONDS = 2                 # length of each rolling buffer segment
 BUFFER_SECONDS = 180                # how much history to retain for pre-roll
-PRE_ROLL = int(os.environ.get("CLIPMIND_PRE_ROLL", 10))    # secs before event
-POST_ROLL = int(os.environ.get("CLIPMIND_POST_ROLL", 8))   # tail after hype ends
+PRE_ROLL = int(os.environ.get("CLIPMIND_PRE_ROLL", 14))    # secs before event
+POST_ROLL = int(os.environ.get("CLIPMIND_POST_ROLL", 12))  # tail after hype ends
 # viral score needed to *open* a highlight. Lowered so normal hype clips.
 SCORE_THRESHOLD = float(os.environ.get("CLIPMIND_THRESHOLD", 42))
 # once open, keep extending the clip while score stays above this
 SUSTAIN_SCORE = float(os.environ.get("CLIPMIND_SUSTAIN", 24))
-MIN_CLIP = int(os.environ.get("CLIPMIND_MIN_CLIP", 15))     # never shorter
-MAX_CLIP = int(os.environ.get("CLIPMIND_MAX_CLIP", 60))     # never longer (1 min)
-MANUAL_CLIP = int(os.environ.get("CLIPMIND_MANUAL", 45))    # length of "Clip now"
+MIN_CLIP = int(os.environ.get("CLIPMIND_MIN_CLIP", 22))     # never shorter
+MAX_CLIP = int(os.environ.get("CLIPMIND_MAX_CLIP", 75))     # never longer
+MANUAL_CLIP = int(os.environ.get("CLIPMIND_MANUAL", 50))    # length of "Clip now"
 CLIP_COOLDOWN = int(os.environ.get("CLIPMIND_COOLDOWN", 15))  # min secs between clips
 DOWNLOADS = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Downloads"
 

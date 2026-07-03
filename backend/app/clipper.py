@@ -58,16 +58,22 @@ def _escape_drawtext(path: Path) -> str:
 
 def build_clip(start: float, end: float, score: float, clip_id: str,
                platform: str | None = None) -> dict | None:
-    # clamp total length to [MIN_CLIP, MAX_CLIP]
-    dur = end - start
-    if dur < config.MIN_CLIP:
-        start = end - config.MIN_CLIP
-    elif dur > config.MAX_CLIP:
-        start = end - config.MAX_CLIP
-    duration = int(round(end - start))
+    # pad the window a touch so we never clip the very start/end of the action
+    start -= config.MIN_CLIP if (end - start) < config.MIN_CLIP else 0
     segs = segments_in_window(start, end)
     if len(segs) < 2:
         return None
+    # Cut on whole-segment boundaries only -> the clip is always CONTINUOUS and
+    # never sliced mid-action. Keep the most recent MAX_CLIP worth of segments
+    # (that's the peak + tail); ensure at least MIN_CLIP.
+    max_segs = max(1, round(config.MAX_CLIP / config.SEGMENT_SECONDS))
+    min_segs = max(2, round(config.MIN_CLIP / config.SEGMENT_SECONDS))
+    if len(segs) > max_segs:
+        segs = segs[-max_segs:]
+    if len(segs) < min_segs:
+        # grab a few extra earlier segments if the buffer has them
+        segs = segments_in_window(end - config.MIN_CLIP, end) or segs
+    duration = len(segs) * config.SEGMENT_SECONDS
 
     work = config.CLIPS
     concat_list = work / f"{clip_id}.txt"
@@ -91,18 +97,18 @@ def build_clip(start: float, end: float, score: float, clip_id: str,
         f"fontcolor=white:fontsize=64:box=1:boxcolor=black@0.55:boxborderw=24:"
         f"x=(w-text_w)/2:y=140:enable='lt(t,4)'"
     )
-    # some encoders re-time concat output from 0; trim from the front so the
-    # clip starts where our window starts rather than at the first segment.
-    seek = max(0.0, start - (_seg_epoch(segs[0]) or start))
-
+    # Re-encode the whole concatenated run — no -ss, no -t, so the FULL clip is
+    # produced continuously. genpts + faststart keep timestamps monotonic and
+    # make the mp4 stream/seek cleanly in the browser and on Instagram.
     cmd = [
         config.FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
-        "-ss", f"{seek:.2f}",
+        "-fflags", "+genpts",
         "-f", "concat", "-safe", "0", "-i", str(concat_list),
         "-vf", vf,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k",
-        "-t", str(duration),
+        "-movflags", "+faststart",
         str(out_path),
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
