@@ -18,3 +18,23 @@ data/
 .env
 .env.local
 *.log
+# Public-source hygiene
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+**/.vercel/
+**/node_modules/
+**/.next/
+**/__pycache__/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+keystore.properties
+*.log
+/work/
+/outputs/
